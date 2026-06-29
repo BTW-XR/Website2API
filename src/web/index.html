@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Website to API</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #171717;
+        --muted: #666b73;
+        --line: #dedede;
+        --panel: #ffffff;
+        --soft: #f6f6f3;
+        --accent: #0f766e;
+        --accent-ink: #ffffff;
+        --danger: #b42318;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--soft);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 48px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: flex-end;
+        margin-bottom: 18px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: clamp(28px, 4vw, 46px);
+        line-height: 1;
+      }
+
+      .subhead {
+        color: var(--muted);
+        margin: 8px 0 0;
+        max-width: 680px;
+      }
+
+      .extractor,
+      .result-block,
+      .detail,
+      .raw-block {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .extractor {
+        padding: 16px;
+        margin-bottom: 18px;
+      }
+
+      .tabs {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 14px;
+      }
+
+      .tab {
+        border: 0;
+        background: #fff;
+        color: var(--muted);
+        padding: 10px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .tab[aria-selected="true"] {
+        background: #e8f3f1;
+        color: #075e58;
+      }
+
+      form {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+      }
+
+      .search-controls {
+        grid-template-columns: 150px 1fr auto;
+      }
+
+      input,
+      select,
+      button {
+        min-height: 44px;
+        border-radius: 8px;
+        font: inherit;
+      }
+
+      input,
+      select {
+        border: 1px solid var(--line);
+        padding: 0 12px;
+        background: #fff;
+        color: var(--ink);
+        width: 100%;
+      }
+
+      button,
+      .button {
+        border: 1px solid transparent;
+        background: var(--accent);
+        color: var(--accent-ink);
+        padding: 0 16px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: pointer;
+        border-radius: 8px;
+        font-weight: 650;
+      }
+
+      button.secondary,
+      .button.secondary {
+        background: #fff;
+        border-color: var(--line);
+        color: var(--ink);
+      }
+
+      button:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+
+      .status {
+        min-height: 22px;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .status.error {
+        color: var(--danger);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+        gap: 14px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .thumb {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background: #ececea;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+
+      .amazon-thumb {
+        aspect-ratio: 1 / 1;
+        padding: 12px;
+      }
+
+      .thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .amazon-thumb img {
+        object-fit: contain;
+      }
+
+      .card-body {
+        padding: 12px;
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .title {
+        font-weight: 700;
+        line-height: 1.25;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.35;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: auto;
+      }
+
+      .actions button,
+      .actions .button {
+        min-height: 38px;
+        padding: 0 12px;
+        font-size: 14px;
+      }
+
+      .result-block {
+        padding: 16px;
+        margin-bottom: 18px;
+      }
+
+      .result-head,
+      .detail-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      .detail {
+        padding: 16px;
+        margin-bottom: 18px;
+      }
+
+      .detail-layout {
+        display: grid;
+        grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+        gap: 18px;
+      }
+
+      .player {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border: 0;
+        border-radius: 8px;
+        background: #111;
+      }
+
+      .hero-image {
+        width: 100%;
+        max-height: 520px;
+        object-fit: contain;
+        background: #f1f1ef;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .section {
+        margin-top: 18px;
+      }
+
+      .section h3 {
+        font-size: 17px;
+        margin-bottom: 8px;
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      dl {
+        display: grid;
+        grid-template-columns: minmax(120px, 0.36fr) 1fr;
+        gap: 8px 14px;
+        margin: 0;
+      }
+
+      dt {
+        color: var(--muted);
+      }
+
+      dd {
+        margin: 0;
+      }
+
+      .raw-block {
+        overflow: hidden;
+      }
+
+      .raw-block summary {
+        cursor: pointer;
+        padding: 12px 16px;
+        font-weight: 700;
+      }
+
+      pre {
+        margin: 0;
+        padding: 0 16px 16px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        color: #263238;
+        font-size: 13px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      @media (max-width: 760px) {
+        header,
+        .result-head,
+        .detail-head {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        form,
+        .search-controls,
+        .detail-layout {
+          grid-template-columns: 1fr;
+        }
+
+        button,
+        .button {
+          width: 100%;
+        }
+
+        dl {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Website to API</h1>
+          <p class="subhead">
+            Extract structured data from supported websites, then inspect the API response and a
+            lightweight visual rendering.
+          </p>
+        </div>
+      </header>
+
+      <section class="extractor" aria-label="Extractor">
+        <div class="tabs" role="tablist" aria-label="Input mode">
+          <button class="tab" id="urlTab" type="button" aria-selected="true">URL</button>
+          <button class="tab" id="searchTab" type="button" aria-selected="false">Search</button>
+        </div>
+
+        <form id="urlForm">
+          <input
+            id="urlInput"
+            name="url"
+            autocomplete="off"
+            value="https://www.youtube.com/watch?v=p6ouOSg3mP0"
+            aria-label="Supported website URL"
+          />
+          <button id="urlSubmit" type="submit">Extract</button>
+        </form>
+
+        <form id="searchForm" class="search-controls hidden">
+          <select id="providerInput" aria-label="Provider">
+            <option value="youtube">YouTube</option>
+            <option value="amazon">Amazon</option>
+          </select>
+          <input
+            id="queryInput"
+            autocomplete="off"
+            value="atlanta"
+            aria-label="Search query"
+          />
+          <button id="searchSubmit" type="submit">Search</button>
+        </form>
+
+        <div id="status" class="status">Ready.</div>
+      </section>
+
+      <section id="visual" aria-live="polite"></section>
+
+      <details class="raw-block" open>
+        <summary>Raw JSON</summary>
+        <pre id="raw">{}</pre>
+      </details>
+    </main>
+
+    <script>
+      const state = {
+        mode: 'url',
+        lastSearch: null,
+        loading: false,
+      };
+
+      const el = {
+        urlTab: document.querySelector('#urlTab'),
+        searchTab: document.querySelector('#searchTab'),
+        urlForm: document.querySelector('#urlForm'),
+        searchForm: document.querySelector('#searchForm'),
+        urlInput: document.querySelector('#urlInput'),
+        providerInput: document.querySelector('#providerInput'),
+        queryInput: document.querySelector('#queryInput'),
+        urlSubmit: document.querySelector('#urlSubmit'),
+        searchSubmit: document.querySelector('#searchSubmit'),
+        status: document.querySelector('#status'),
+        visual: document.querySelector('#visual'),
+        raw: document.querySelector('#raw'),
+      };
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#039;');
+      }
+
+      function setMode(mode) {
+        state.mode = mode;
+        el.urlTab.setAttribute('aria-selected', String(mode === 'url'));
+        el.searchTab.setAttribute('aria-selected', String(mode === 'search'));
+        el.urlForm.classList.toggle('hidden', mode !== 'url');
+        el.searchForm.classList.toggle('hidden', mode !== 'search');
+        setStatus('Ready.');
+      }
+
+      function setLoading(isLoading, message) {
+        state.loading = isLoading;
+        el.urlSubmit.disabled = isLoading;
+        el.searchSubmit.disabled = isLoading;
+        if (message) setStatus(message);
+      }
+
+      function setStatus(message, isError = false) {
+        el.status.textContent = message;
+        el.status.classList.toggle('error', isError);
+      }
+
+      async function extract(request) {
+        setLoading(true, 'Fetching and parsing...');
+        try {
+          const response = await fetch('/api/extract', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(request),
+          });
+          const payload = await response.json();
+          el.raw.textContent = JSON.stringify(payload, null, 2);
+          if (!payload.ok) {
+            el.visual.innerHTML = '';
+            setStatus(payload.error || 'Extraction failed.', true);
+            return null;
+          }
+          setStatus(`Loaded ${payload.provider} ${payload.type}.`);
+          render(payload);
+          return payload;
+        } catch (error) {
+          el.raw.textContent = JSON.stringify(
+            { ok: false, code: 'REQUEST_FAILED', error: error.message },
+            null,
+            2,
+          );
+          el.visual.innerHTML = '';
+          setStatus(error.message || 'Request failed.', true);
+          return null;
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      function cardImage(src, title, amazon = false) {
+        if (!src) return `<div class="thumb ${amazon ? 'amazon-thumb' : ''} meta">No image</div>`;
+        return `<div class="thumb ${amazon ? 'amazon-thumb' : ''}"><img src="${escapeHtml(src)}" alt="${escapeHtml(title)}" loading="lazy" /></div>`;
+      }
+
+      function render(payload) {
+        if (payload.type === 'search') state.lastSearch = payload;
+        if (payload.provider === 'amazon' && payload.type === 'search') renderAmazonSearch(payload);
+        if (payload.provider === 'amazon' && payload.type === 'product') renderAmazonProduct(payload);
+        if (payload.provider === 'youtube' && payload.type === 'search') renderYouTubeSearch(payload);
+        if (payload.provider === 'youtube' && payload.type === 'video') renderYouTubeVideo(payload);
+      }
+
+      function renderAmazonSearch(payload) {
+        const products = payload.data.products || [];
+        el.visual.innerHTML = `
+          <section class="result-block">
+            <div class="result-head">
+              <div>
+                <h2>Amazon products</h2>
+                <div class="meta">${escapeHtml(payload.data.resultCount || payload.sourceUrl)}</div>
+              </div>
+            </div>
+            <div class="grid">
+              ${products
+                .map(
+                  (product) => `
+                    <article class="card">
+                      ${cardImage(product.image, product.title, true)}
+                      <div class="card-body">
+                        <div class="title">${escapeHtml(product.title)}</div>
+                        <div class="meta">${escapeHtml([product.price, product.rating, product.reviewCount].filter(Boolean).join(' | '))}</div>
+                        <div class="actions">
+                          ${
+                            product.url
+                              ? `<button data-action="details" data-url="${escapeHtml(product.url)}">View details</button><a class="button secondary" href="${escapeHtml(product.url)}" target="_blank" rel="noreferrer">Open</a>`
+                              : '<button disabled>No product URL</button>'
+                          }
+                        </div>
+                      </div>
+                    </article>
+                  `,
+                )
+                .join('')}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderAmazonProduct(payload) {
+        const data = payload.data;
+        const image = data.images?.[0];
+        el.visual.innerHTML = `
+          <section class="detail">
+            <div class="detail-head">
+              <div>
+                <h2>${escapeHtml(data.title)}</h2>
+                <div class="meta">${escapeHtml([data.price, data.rating, data.reviewCount, data.availability].filter(Boolean).join(' | '))}</div>
+              </div>
+              <div class="actions">
+                ${backButton()}
+                <a class="button secondary" href="${escapeHtml(payload.sourceUrl)}" target="_blank" rel="noreferrer">Open on Amazon</a>
+              </div>
+            </div>
+            <div class="detail-layout">
+              <div>${image ? `<img class="hero-image" src="${escapeHtml(image)}" alt="${escapeHtml(data.title)}" />` : '<div class="thumb amazon-thumb meta">No image</div>'}</div>
+              <div>
+                ${listSection('About this item', data.featureBullets)}
+                ${detailsSection(data.details)}
+                ${reviewsSection(data.reviewSignals)}
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      function renderYouTubeSearch(payload) {
+        const videos = payload.data.videos || [];
+        el.visual.innerHTML = `
+          <section class="result-block">
+            <div class="result-head">
+              <div>
+                <h2>YouTube videos</h2>
+                <div class="meta">${escapeHtml(payload.data.query || payload.sourceUrl)}</div>
+              </div>
+            </div>
+            <div class="grid">
+              ${videos
+                .map(
+                  (video) => `
+                    <article class="card">
+                      ${cardImage(video.thumbnail, video.title)}
+                      <div class="card-body">
+                        <div class="title">${escapeHtml(video.title)}</div>
+                        <div class="meta">${escapeHtml([video.channel, video.views, video.published, video.duration].filter(Boolean).join(' | '))}</div>
+                        <div class="actions">
+                          <button data-action="details" data-url="${escapeHtml(video.url)}">Watch</button>
+                          <a class="button secondary" href="${escapeHtml(video.url)}" target="_blank" rel="noreferrer">Open</a>
+                        </div>
+                      </div>
+                    </article>
+                  `,
+                )
+                .join('')}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderYouTubeVideo(payload) {
+        const data = payload.data;
+        el.visual.innerHTML = `
+          <section class="detail">
+            <div class="detail-head">
+              <div>
+                <h2>${escapeHtml(data.title)}</h2>
+                <div class="meta">${escapeHtml([data.channel, data.views, secondsToTime(data.lengthSeconds), data.subscriberCount].filter(Boolean).join(' | '))}</div>
+              </div>
+              <div class="actions">
+                ${backButton()}
+                <a class="button secondary" href="${escapeHtml(payload.sourceUrl)}" target="_blank" rel="noreferrer">Open on YouTube</a>
+              </div>
+            </div>
+            <iframe class="player" src="${escapeHtml(data.embedUrl)}" title="${escapeHtml(data.title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+            <div class="section">
+              <h3>Description</h3>
+              <p class="meta">${escapeHtml(data.description || 'No description found.')}</p>
+            </div>
+            ${videoGridSection('More videos', data.relatedVideos)}
+            ${commentsSection(data.comments)}
+          </section>
+        `;
+      }
+
+      function backButton() {
+        return state.lastSearch ? '<button class="secondary" data-action="back">Back to results</button>' : '';
+      }
+
+      function listSection(title, items) {
+        if (!items?.length) return '';
+        return `
+          <div class="section">
+            <h3>${escapeHtml(title)}</h3>
+            <ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+          </div>
+        `;
+      }
+
+      function detailsSection(details) {
+        if (!details?.length) return '';
+        return `
+          <div class="section">
+            <h3>Product details</h3>
+            <dl>
+              ${details
+                .map(
+                  (item) =>
+                    `<dt>${escapeHtml(item.label)}</dt><dd>${escapeHtml(item.value)}</dd>`,
+                )
+                .join('')}
+            </dl>
+          </div>
+        `;
+      }
+
+      function reviewsSection(reviews) {
+        if (!reviews?.length) return '';
+        return `
+          <div class="section">
+            <h3>Review signals</h3>
+            <div class="grid">
+              ${reviews
+                .map(
+                  (review) => `
+                    <article class="card"><div class="card-body">
+                      <div class="title">${escapeHtml(review.title || review.rating || 'Review')}</div>
+                      <div class="meta">${escapeHtml([review.rating, review.body].filter(Boolean).join(' | '))}</div>
+                    </div></article>
+                  `,
+                )
+                .join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      function videoGridSection(title, videos) {
+        if (!videos?.length) return '';
+        return `
+          <div class="section">
+            <h3>${escapeHtml(title)}</h3>
+            <div class="grid">
+              ${videos
+                .map(
+                  (video) => `
+                    <article class="card">
+                      ${cardImage(video.thumbnail, video.title)}
+                      <div class="card-body">
+                        <div class="title">${escapeHtml(video.title)}</div>
+                        <div class="meta">${escapeHtml([video.channel, video.views, video.duration].filter(Boolean).join(' | '))}</div>
+                        <div class="actions">
+                          <button data-action="details" data-url="${escapeHtml(video.url)}">Watch</button>
+                        </div>
+                      </div>
+                    </article>
+                  `,
+                )
+                .join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      function commentsSection(comments) {
+        if (!comments?.length) return '';
+        return `
+          <div class="section">
+            <h3>Comments</h3>
+            <div class="grid">
+              ${comments
+                .map(
+                  (comment) => `
+                    <article class="card"><div class="card-body">
+                      <div class="title">${escapeHtml(comment.author || 'Comment')}</div>
+                      <div class="meta">${escapeHtml([comment.published, comment.likeCount].filter(Boolean).join(' | '))}</div>
+                      <p>${escapeHtml(comment.content)}</p>
+                    </div></article>
+                  `,
+                )
+                .join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      function secondsToTime(seconds) {
+        const total = Number.parseInt(seconds, 10);
+        if (!Number.isFinite(total)) return null;
+        const minutes = Math.floor(total / 60);
+        const rest = total % 60;
+        return `${minutes}:${String(rest).padStart(2, '0')}`;
+      }
+
+      el.urlTab.addEventListener('click', () => setMode('url'));
+      el.searchTab.addEventListener('click', () => setMode('search'));
+
+      el.urlForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        extract({ url: el.urlInput.value.trim() });
+      });
+
+      el.searchForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        extract({
+          provider: el.providerInput.value,
+          type: 'search',
+          query: el.queryInput.value.trim(),
+        });
+      });
+
+      el.visual.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const action = button.dataset.action;
+        if (action === 'back' && state.lastSearch) {
+          render(state.lastSearch);
+          el.raw.textContent = JSON.stringify(state.lastSearch, null, 2);
+          setStatus(`Restored ${state.lastSearch.provider} results.`);
+        }
+        if (action === 'details') {
+          const url = button.dataset.url;
+          if (url) extract({ url });
+        }
+      });
+    </script>
+  </body>
+</html>
