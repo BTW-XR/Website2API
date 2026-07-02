@@ -1,0 +1,29 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - us-east1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/website-to-api:$BUILD_ID
+      - .
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - us-east1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/website-to-api:$BUILD_ID
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - website-to-api
+      - --image
+      - us-east1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/website-to-api:$BUILD_ID
+      - --region
+      - us-east1
+      - --platform
+      - managed
+      - --allow-unauthenticated
+      - --port
+      - '8080'
+
+images:
+  - us-east1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/website-to-api:$BUILD_ID

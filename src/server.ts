@@ -1,10 +1,11 @@
-import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
+import Fastify, { type FastifyReply } from 'fastify';
 import { readFile } from 'node:fs/promises';
 import { ExtractError, type ExtractFailure, type ExtractRequest } from './core/types.js';
 import { extract } from './providers/index.js';
 
 const app = Fastify({ logger: true });
 const indexHtml = await readFile(new URL('./web/index.html', import.meta.url), 'utf8');
+const CORS_ALLOW_ORIGIN = '*';
 const CORS_ALLOW_METHODS = 'POST, OPTIONS';
 const CORS_ALLOW_HEADERS = 'Content-Type, Authorization';
 
@@ -12,37 +13,11 @@ function isExtractRoute(url: string): boolean {
   return url.split('?')[0] === '/api/extract';
 }
 
-function isAllowedCorsOrigin(origin: unknown): origin is string {
-  if (typeof origin !== 'string') {
-    return false;
-  }
-
-  try {
-    const url = new URL(origin);
-    return (
-      url.protocol === 'http:' &&
-      (url.hostname === '127.0.0.1' || url.hostname === 'localhost')
-    );
-  } catch {
-    return false;
-  }
-}
-
-function applyCorsHeaders(
-  request: FastifyRequest,
-  reply: FastifyReply,
-): boolean {
-  const origin = request.headers.origin;
-  if (!isAllowedCorsOrigin(origin)) {
-    return false;
-  }
-
+function applyCorsHeaders(reply: FastifyReply): void {
   reply
-    .header('Access-Control-Allow-Origin', origin)
+    .header('Access-Control-Allow-Origin', CORS_ALLOW_ORIGIN)
     .header('Access-Control-Allow-Methods', CORS_ALLOW_METHODS)
-    .header('Access-Control-Allow-Headers', CORS_ALLOW_HEADERS)
-    .header('Vary', 'Origin');
-  return true;
+    .header('Access-Control-Allow-Headers', CORS_ALLOW_HEADERS);
 }
 
 function failureFromError(error: unknown): { statusCode: number; body: ExtractFailure } {
@@ -62,7 +37,7 @@ function failureFromError(error: unknown): { statusCode: number; body: ExtractFa
 
 app.addHook('onRequest', async (request, reply) => {
   if (isExtractRoute(request.url)) {
-    applyCorsHeaders(request, reply);
+    applyCorsHeaders(reply);
   }
 });
 
@@ -70,15 +45,8 @@ app.get('/', async (_request, reply) => {
   return reply.type('text/html; charset=utf-8').send(indexHtml);
 });
 
-app.options('/api/extract', async (request, reply) => {
-  if (!applyCorsHeaders(request, reply) && typeof request.headers.origin === 'string') {
-    return reply.code(403).send({
-      ok: false,
-      code: 'CORS_FORBIDDEN',
-      error: 'Origin is not allowed.',
-    });
-  }
-
+app.options('/api/extract', async (_request, reply) => {
+  applyCorsHeaders(reply);
   return reply.code(204).send();
 });
 
@@ -94,5 +62,6 @@ app.post<{ Body: ExtractRequest }>('/api/extract', async (request, reply) => {
 
 const parsedPort = Number.parseInt(process.env['PORT'] ?? '', 10);
 const port = Number.isFinite(parsedPort) ? parsedPort : 3040;
+const host = process.env['HOST'] ?? '0.0.0.0';
 
-await app.listen({ port, host: '127.0.0.1' });
+await app.listen({ port, host });
