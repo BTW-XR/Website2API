@@ -27,3 +27,6 @@ steps:
 
 images:
   - us-east1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/website-to-api:$BUILD_ID
+
+options:
+  logging: CLOUD_LOGGING_ONLY
