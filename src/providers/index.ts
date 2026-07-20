@@ -8,6 +8,10 @@ import {
   extractYouTubeSearch,
   extractYouTubeVideo,
 } from './youtube.js';
+import {
+  canHandleGoogleFlightsUrl,
+  extractGoogleFlightsSearch,
+} from './google-flights.js';
 import { type ExtractRequest, type ExtractSuccess, unsupported } from '../core/types.js';
 
 function parseUrl(input: unknown): URL | null {
@@ -32,6 +36,11 @@ export async function extract(input: ExtractRequest): Promise<ExtractSuccess> {
     unsupported('YouTube requires type "search" or "video"');
   }
 
+  if (input.provider === 'google-flights') {
+    if (input.type === 'search') return extractGoogleFlightsSearch(input);
+    unsupported('Google Flights requires type "search" and a Google Flights search URL');
+  }
+
   const url = parseUrl(input.url);
   if (!url) unsupported('Provide a supported URL, or provider/type/query');
 
@@ -42,6 +51,12 @@ export async function extract(input: ExtractRequest): Promise<ExtractSuccess> {
   const youtubeType = canHandleYouTubeUrl(url);
   if (youtubeType === 'search') return extractYouTubeSearch({ url: url.href });
   if (youtubeType === 'video') return extractYouTubeVideo({ url: url.href });
+
+  const googleFlightsType = canHandleGoogleFlightsUrl(url);
+  if (googleFlightsType === 'search') return extractGoogleFlightsSearch({ url: url.href });
+  if (googleFlightsType === 'booking') {
+    unsupported('Google Flights booking detail pages are not supported yet');
+  }
 
   unsupported('Unsupported URL');
 }

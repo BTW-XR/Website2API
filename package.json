@@ -7,6 +7,7 @@
     "build": "tsc && mkdir -p dist/web && cp src/web/index.html dist/web/index.html",
     "dev": "tsx src/server.ts",
     "start": "node dist/server.js",
+    "test": "tsx --test src/**/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

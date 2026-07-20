@@ -162,6 +162,139 @@
         color: var(--danger);
       }
 
+      .flight-hero {
+        background: linear-gradient(135deg, #e8f3f1 0%, #f8fbfa 70%);
+        border: 1px solid #bcd9d5;
+        border-radius: 10px;
+        padding: 18px;
+        margin-bottom: 16px;
+      }
+
+      .flight-route {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: clamp(28px, 5vw, 46px);
+        font-weight: 760;
+        line-height: 1;
+      }
+
+      .flight-route-arrow {
+        color: var(--accent);
+        font-weight: 400;
+      }
+
+      .flight-summary,
+      .coverage-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border: 1px solid #cfd7d5;
+        border-radius: 999px;
+        background: #fff;
+        color: #39413f;
+        padding: 3px 9px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .pill.good {
+        border-color: #9acdc5;
+        background: #e8f5f2;
+        color: #075e58;
+      }
+
+      .pill.warn {
+        border-color: #e4c996;
+        background: #fff7e8;
+        color: #7a4b00;
+      }
+
+      .coverage-panel {
+        background: #fbfbf9;
+        border: 1px dashed #c9cfcd;
+        border-radius: 8px;
+        padding: 14px;
+        margin-bottom: 18px;
+      }
+
+      .coverage-panel h3 {
+        font-size: 16px;
+      }
+
+      .coverage-item {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .coverage-item strong {
+        color: var(--ink);
+      }
+
+      .flight-list {
+        display: grid;
+        gap: 9px;
+      }
+
+      .flight-row {
+        display: grid;
+        grid-template-columns: minmax(170px, 1.3fr) minmax(125px, 0.8fr) minmax(115px, 0.75fr) minmax(105px, 0.7fr) minmax(80px, auto);
+        gap: 16px;
+        align-items: center;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .flight-times {
+        font-size: 18px;
+        font-weight: 750;
+      }
+
+      .flight-airports {
+        margin-top: 3px;
+      }
+
+      .flight-price {
+        text-align: right;
+        font-size: 20px;
+        font-weight: 760;
+      }
+
+      .flight-price-cell {
+        display: grid;
+        justify-items: end;
+        gap: 8px;
+      }
+
+      .flight-details-link {
+        min-height: 34px;
+        padding: 0 10px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .flight-price.unavailable {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .flight-section + .flight-section {
+        margin-top: 22px;
+      }
+
+      .flight-section h3 {
+        margin-bottom: 10px;
+      }
+
       .grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
@@ -377,6 +510,18 @@
         dl {
           grid-template-columns: 1fr;
         }
+
+        .flight-row {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .flight-price {
+          text-align: left;
+        }
+
+        .flight-price-cell {
+          justify-items: start;
+        }
       }
     </style>
   </head>
@@ -386,8 +531,8 @@
         <div>
           <h1>Website to API</h1>
           <p class="subhead">
-            Extract structured data from supported websites, then inspect the API response and a
-            lightweight visual rendering.
+            Extract structured data from Amazon, YouTube, and Google Flights, then inspect the API
+            response and a lightweight visual rendering.
           </p>
         </div>
       </header>
@@ -403,7 +548,7 @@
             id="urlInput"
             name="url"
             autocomplete="off"
-            value="https://www.youtube.com/watch?v=p6ouOSg3mP0"
+            value="https://www.google.com/travel/flights/search?tfs=CBwQAhojEgoyMDI2LTEwLTE5agwIAhIIL20vMDEzeXFyBwgBEgNNU1BAAUgBcAGCAQsI____________AZgBAg&amp;tfu=EgYIABAAGAA"
             aria-label="Supported website URL"
           />
           <button id="urlSubmit" type="submit">Extract</button>
@@ -547,6 +692,130 @@
         if (payload.provider === 'amazon' && payload.type === 'product') renderAmazonProduct(payload);
         if (payload.provider === 'youtube' && payload.type === 'search') renderYouTubeSearch(payload);
         if (payload.provider === 'youtube' && payload.type === 'video') renderYouTubeVideo(payload);
+        if (payload.provider === 'google-flights' && payload.type === 'search') renderGoogleFlightsSearch(payload);
+      }
+
+      function renderGoogleFlightsSearch(payload) {
+        const data = payload.data;
+        const flights = data.flights || [];
+        const topFlights = flights.filter((flight) => flight.group === 'top');
+        const otherFlights = flights.filter((flight) => flight.group === 'other');
+        const covered = {
+          schedule: flights.filter((flight) => flight.departure?.timeText && flight.arrival?.timeText).length,
+          airline: flights.filter((flight) => flight.airlines?.length).length,
+          price: flights.filter((flight) => flight.price?.amount != null).length,
+          stops: flights.filter((flight) => flight.stops != null).length,
+          baggage: flights.filter((flight) => flight.baggage?.carryOnIncluded != null || flight.baggage?.checkedIncluded != null).length,
+          emissions: flights.filter((flight) => flight.emissions?.kilogramsCo2e != null).length,
+          links: flights.filter((flight) => flight.detailsUrl).length,
+        };
+        const origin = data.origin?.code || data.origin?.name || 'Origin';
+        const destination = data.destination?.code || data.destination?.name || 'Destination';
+        el.visual.innerHTML = `
+          <section class="result-block">
+            <div class="flight-hero">
+              <div class="result-head">
+                <div>
+                  <div class="flight-route">
+                    <span>${escapeHtml(origin)}</span>
+                    <span class="flight-route-arrow">→</span>
+                    <span>${escapeHtml(destination)}</span>
+                  </div>
+                  <div class="flight-summary">
+                    ${summaryPill(data.departureDate || 'Date unavailable')}
+                    ${summaryPill(data.tripType || 'Trip type unavailable')}
+                    ${summaryPill(data.cabinClass || 'Cabin unavailable')}
+                    ${summaryPill(data.passengerCount ? `${data.passengerCount} passenger${data.passengerCount === 1 ? '' : 's'}` : 'Passengers unavailable')}
+                    ${summaryPill(`${data.summary.total} results`, 'good')}
+                    ${data.summary.lowestPriceDisplay ? summaryPill(`From ${data.summary.lowestPriceDisplay}`, 'good') : ''}
+                  </div>
+                </div>
+                <a class="button secondary" href="${escapeHtml(payload.sourceUrl)}" target="_blank" rel="noreferrer">Open on Google Flights</a>
+              </div>
+              ${data.summary.priceInsight ? `<div class="meta">${escapeHtml(data.summary.priceInsight)}</div>` : ''}
+            </div>
+            ${coveragePanel(covered, flights.length)}
+            ${flightSection('Top flights', topFlights)}
+            ${flightSection('Other flights', otherFlights)}
+          </section>
+        `;
+      }
+
+      function summaryPill(text, tone = '') {
+        return `<span class="pill ${escapeHtml(tone)}">${escapeHtml(text)}</span>`;
+      }
+
+      function coveragePanel(covered, total) {
+        const items = [
+          ['Route', total],
+          ['Schedule', covered.schedule],
+          ['Airline', covered.airline],
+          ['Price', covered.price],
+          ['Stops', covered.stops],
+          ['Baggage', covered.baggage],
+          ['Emissions', covered.emissions],
+          ['Details links', covered.links],
+        ];
+        return `
+          <div class="coverage-panel">
+            <h3>Data coverage</h3>
+            <div class="coverage-grid">
+              ${items.map(([label, count]) => `<span class="coverage-item"><strong>${escapeHtml(label)}</strong> ${count}/${total}</span>`).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      function flightSection(title, flights) {
+        if (!flights.length) return '';
+        return `
+          <div class="flight-section">
+            <h3>${escapeHtml(title)} <span class="meta">${flights.length}</span></h3>
+            <div class="flight-list">
+              ${flights.map(flightRow).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      function flightRow(flight) {
+        const lowEmissions = flight.emissions?.differencePercent != null && flight.emissions.differencePercent < 0;
+        const baggage = [
+          flight.baggage?.carryOnIncluded != null ? `${flight.baggage.carryOnIncluded} carry-on` : null,
+          flight.baggage?.checkedIncluded != null ? `${flight.baggage.checkedIncluded} checked` : null,
+        ].filter(Boolean).join(' · ');
+        const layover = flight.layovers?.length
+          ? flight.layovers.map((item) => [item.durationText, item.airportCode || item.airportName].filter(Boolean).join(' at ')).join(' · ')
+          : '';
+        return `
+          <article class="flight-row">
+            <div>
+              <div class="flight-times">${escapeHtml(flight.departure.timeText)} – ${escapeHtml(flight.arrival.timeText)}</div>
+              <div class="meta flight-airports">${escapeHtml(flight.departure.code || flight.departure.name)} → ${escapeHtml(flight.arrival.code || flight.arrival.name)}</div>
+            </div>
+            <div>
+              <div class="title">${escapeHtml((flight.airlines || []).join(', ') || 'Airline unavailable')}</div>
+              <div class="meta">${escapeHtml(baggage || 'Baggage unavailable')}</div>
+            </div>
+            <div>
+              <div>${escapeHtml(flight.durationText)}</div>
+              ${layover ? `<div class="meta">${escapeHtml(layover)}</div>` : ''}
+            </div>
+            <div>
+              ${summaryPill(flight.stops === 0 ? 'Nonstop' : flight.stopsText, flight.stops === 0 ? 'good' : '')}
+              ${flight.emissions?.display ? `<div class="meta">${escapeHtml(flight.emissions.display)}</div>` : ''}
+              ${lowEmissions ? summaryPill(`${flight.emissions.differencePercent}% emissions`, 'good') : ''}
+            </div>
+            <div class="flight-price-cell">
+              <div class="flight-price ${flight.price.status === 'unavailable' ? 'unavailable' : ''}">${escapeHtml(flight.price.display)}</div>
+              ${
+                flight.detailsUrl
+                  ? `<a class="button secondary flight-details-link" href="${escapeHtml(flight.detailsUrl)}" target="_blank" rel="noreferrer">View details ↗</a>`
+                  : '<span class="meta">Link unavailable</span>'
+              }
+            </div>
+          </article>
+        `;
       }
 
       function renderAmazonSearch(payload) {

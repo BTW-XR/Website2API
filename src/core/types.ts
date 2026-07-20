@@ -1,4 +1,4 @@
-export type ProviderName = 'amazon' | 'youtube';
+export type ProviderName = 'amazon' | 'youtube' | 'google-flights';
 
 export type ExtractType = 'search' | 'product' | 'video';
 

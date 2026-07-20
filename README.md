@@ -6,6 +6,7 @@ Supported providers:
 
 - Amazon search pages and product pages
 - YouTube search pages and watch pages
+- Google Flights search result pages
 
 ## Setup
 
@@ -28,6 +29,9 @@ URL extraction:
 ```json
 { "url": "https://www.youtube.com/watch?v=p6ouOSg3mP0" }
 ```
+
+Google Flights accepts `/travel/flights/search` URLs. Each search entry includes a `detailsUrl`
+that opens Google's original booking page; extracting booking-page details is not supported.
 
 Provider search:
 
