@@ -80,6 +80,30 @@ export interface GoogleFlightsSearchData {
     priceInsight: string | null;
   };
   flights: GoogleFlightEntry[];
+  searchCriteria?: GoogleFlightsSearchCriteria;
+}
+
+export type GoogleFlightsTripType = 'one-way' | 'round-trip';
+export type GoogleFlightsCabinClass = 'economy' | 'premium-economy' | 'business' | 'first';
+
+export interface GoogleFlightsSearchCriteria {
+  origin: string;
+  destination: string;
+  departureDate: string;
+  returnDate?: string;
+  tripType: GoogleFlightsTripType;
+  adults: number;
+  cabinClass: GoogleFlightsCabinClass;
+}
+
+export interface GoogleFlightsStructuredSearchInput {
+  origin?: unknown;
+  destination?: unknown;
+  departureDate?: unknown;
+  returnDate?: unknown;
+  tripType?: unknown;
+  adults?: unknown;
+  cabinClass?: unknown;
 }
 
 const GOOGLE_HOSTS = new Set(['google.com', 'www.google.com']);
@@ -194,6 +218,124 @@ function encodeBytes(field: number, value: Buffer): Buffer {
 
 function encodeString(field: number, value: string): Buffer {
   return encodeBytes(field, Buffer.from(value, 'utf8'));
+}
+
+function encodeInteger(field: number, value: number): Buffer {
+  return Buffer.concat([encodeVarint(field << 3), encodeVarint(value)]);
+}
+
+function isIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 0));
+  return parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() + 1 === month &&
+    parsed.getUTCDate() === day;
+}
+
+function currentIsoDate(now: Date): string {
+  return [
+    now.getUTCFullYear().toString().padStart(4, '0'),
+    (now.getUTCMonth() + 1).toString().padStart(2, '0'),
+    now.getUTCDate().toString().padStart(2, '0'),
+  ].join('-');
+}
+
+function normalizeAirportCode(value: unknown, label: string): string {
+  const code = typeof value === 'string' ? value.trim().toUpperCase() : '';
+  if (!/^[A-Z]{3}$/.test(code)) {
+    unsupported(`${label} must be a three-letter IATA airport code`);
+  }
+  return code;
+}
+
+export function normalizeGoogleFlightsSearchCriteria(
+  input: GoogleFlightsStructuredSearchInput,
+  now = new Date(),
+): GoogleFlightsSearchCriteria {
+  const origin = normalizeAirportCode(input.origin, 'Origin');
+  const destination = normalizeAirportCode(input.destination, 'Destination');
+  if (origin === destination) unsupported('Origin and destination must be different airports');
+
+  const tripType = input.tripType;
+  if (tripType !== 'one-way' && tripType !== 'round-trip') {
+    unsupported('Google Flights tripType must be "one-way" or "round-trip"');
+  }
+
+  const cabinClass = input.cabinClass;
+  if (!['economy', 'premium-economy', 'business', 'first'].includes(String(cabinClass))) {
+    unsupported('Google Flights cabinClass must be economy, premium-economy, business, or first');
+  }
+
+  const adults = input.adults;
+  if (!Number.isInteger(adults) || Number(adults) < 1 || Number(adults) > 9) {
+    unsupported('Google Flights adults must be an integer from 1 to 9');
+  }
+
+  const departureDate = typeof input.departureDate === 'string' ? input.departureDate.trim() : '';
+  if (!isIsoDate(departureDate)) unsupported('Google Flights departureDate must be a valid YYYY-MM-DD date');
+  if (departureDate < currentIsoDate(now)) unsupported('Google Flights departureDate cannot be in the past');
+
+  const returnDate = typeof input.returnDate === 'string' ? input.returnDate.trim() : '';
+  if (tripType === 'round-trip') {
+    if (!isIsoDate(returnDate)) unsupported('Round-trip searches require a valid returnDate');
+    if (returnDate < departureDate) unsupported('Google Flights returnDate cannot be before departureDate');
+  }
+
+  return {
+    origin,
+    destination,
+    departureDate,
+    ...(tripType === 'round-trip' ? { returnDate } : {}),
+    tripType,
+    adults: Number(adults),
+    cabinClass: cabinClass as GoogleFlightsCabinClass,
+  };
+}
+
+function encodeAirport(code: string): Buffer {
+  return Buffer.concat([encodeInteger(1, 1), encodeString(2, code)]);
+}
+
+function encodeFlightLeg(origin: string, destination: string, date: string): Buffer {
+  return Buffer.concat([
+    encodeString(2, date),
+    encodeBytes(13, encodeAirport(origin)),
+    encodeBytes(14, encodeAirport(destination)),
+  ]);
+}
+
+const CABIN_CLASS_CODES: Record<GoogleFlightsCabinClass, number> = {
+  economy: 1,
+  'premium-economy': 2,
+  business: 3,
+  first: 4,
+};
+
+export function buildGoogleFlightsSearchUrl(criteria: GoogleFlightsSearchCriteria): URL {
+  const legs = [encodeFlightLeg(criteria.origin, criteria.destination, criteria.departureDate)];
+  if (criteria.tripType === 'round-trip' && criteria.returnDate) {
+    legs.push(encodeFlightLeg(criteria.destination, criteria.origin, criteria.returnDate));
+  }
+
+  const filterDefaults = Buffer.from('08ffffffffffffffffff01', 'hex');
+  const payload = Buffer.concat([
+    encodeInteger(1, 28),
+    encodeInteger(2, criteria.tripType === 'one-way' ? 2 : 0),
+    ...legs.map((leg) => encodeBytes(3, leg)),
+    encodeInteger(8, 1),
+    encodeInteger(9, criteria.adults),
+    encodeInteger(14, 1),
+    encodeBytes(16, filterDefaults),
+    encodeInteger(19, CABIN_CLASS_CODES[criteria.cabinClass]),
+  ]);
+
+  const url = new URL('https://www.google.com/travel/flights/search');
+  url.searchParams.set('tfs', payload.toString('base64url'));
+  url.searchParams.set('hl', 'en-US');
+  url.searchParams.set('gl', 'US');
+  url.searchParams.set('curr', 'USD');
+  return url;
 }
 
 function replaceSearchSelection(searchTfs: string, selections: Buffer[]): string | null {
@@ -611,5 +753,21 @@ export async function extractGoogleFlightsSearch(input: {
     type: 'search',
     sourceUrl: url.href,
     data: parseGoogleFlightsSearchHtml(html, url),
+  };
+}
+
+export async function extractGoogleFlightsStructuredSearch(
+  input: GoogleFlightsStructuredSearchInput,
+): Promise<ExtractSuccess<GoogleFlightsSearchData>> {
+  const searchCriteria = normalizeGoogleFlightsSearchCriteria(input);
+  const response = await extractGoogleFlightsSearch({
+    url: buildGoogleFlightsSearchUrl(searchCriteria).href,
+  });
+  return {
+    ...response,
+    data: {
+      ...response.data,
+      searchCriteria,
+    },
   };
 }

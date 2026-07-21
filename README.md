@@ -33,6 +33,27 @@ URL extraction:
 Google Flights accepts `/travel/flights/search` URLs. Each search entry includes a `detailsUrl`
 that opens Google's original booking page; extracting booking-page details is not supported.
 
+Google Flights also accepts structured searches:
+
+```json
+{
+  "provider": "google-flights",
+  "type": "search",
+  "origin": "JFK",
+  "destination": "LAX",
+  "departureDate": "2026-08-10",
+  "returnDate": "2026-08-17",
+  "tripType": "round-trip",
+  "adults": 1,
+  "cabinClass": "economy"
+}
+```
+
+`tripType` is `one-way` or `round-trip`; `cabinClass` is `economy`,
+`premium-economy`, `business`, or `first`. Airports use three-letter IATA
+codes. Structured responses include the normalized request as
+`data.searchCriteria`. One-way requests omit `returnDate`.
+
 Provider search:
 
 ```json

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildGoogleFlightsSearchUrl,
   canHandleGoogleFlightsUrl,
   extractGoogleFlightsSearch,
+  normalizeGoogleFlightsSearchCriteria,
   parseGoogleFlightsSearchHtml,
 } from './google-flights.js';
 
@@ -58,6 +60,112 @@ const fixture = `<!doctype html>
       </script>
     </body>
   </html>`;
+
+function readVarint(buffer: Buffer, start: number): { value: number; end: number } {
+  let value = 0;
+  let multiplier = 1;
+  for (let index = start; index < buffer.length; index += 1) {
+    const byte = buffer[index];
+    assert.notEqual(byte, undefined);
+    value += (byte! & 0x7f) * multiplier;
+    if ((byte! & 0x80) === 0) return { value, end: index + 1 };
+    multiplier *= 128;
+  }
+  throw new Error('Invalid varint');
+}
+
+function outerVarints(url: URL): Map<number, number[]> {
+  const buffer = Buffer.from(url.searchParams.get('tfs') ?? '', 'base64url');
+  const values = new Map<number, number[]>();
+  let offset = 0;
+  while (offset < buffer.length) {
+    const tag = readVarint(buffer, offset);
+    const field = Math.floor(tag.value / 8);
+    const wire = tag.value % 8;
+    if (wire === 0) {
+      const value = readVarint(buffer, tag.end);
+      values.set(field, [...(values.get(field) ?? []), value.value]);
+      offset = value.end;
+    } else if (wire === 2) {
+      const length = readVarint(buffer, tag.end);
+      offset = length.end + length.value;
+    } else {
+      throw new Error(`Unsupported wire type ${wire}`);
+    }
+  }
+  return values;
+}
+
+test('normalizes and encodes one-way structured searches', () => {
+  const criteria = normalizeGoogleFlightsSearchCriteria({
+    origin: 'jfk',
+    destination: ' lax ',
+    departureDate: '2099-08-10',
+    tripType: 'one-way',
+    adults: 2,
+    cabinClass: 'business',
+  }, new Date('2099-01-01T00:00:00Z'));
+  assert.deepEqual(criteria, {
+    origin: 'JFK',
+    destination: 'LAX',
+    departureDate: '2099-08-10',
+    tripType: 'one-way',
+    adults: 2,
+    cabinClass: 'business',
+  });
+
+  const url = buildGoogleFlightsSearchUrl(criteria);
+  const decoded = Buffer.from(url.searchParams.get('tfs') ?? '', 'base64url');
+  const fields = outerVarints(url);
+  assert.equal(url.pathname, '/travel/flights/search');
+  assert.equal(decoded.includes(Buffer.from('JFK')), true);
+  assert.equal(decoded.includes(Buffer.from('LAX')), true);
+  assert.equal(decoded.includes(Buffer.from('2099-08-10')), true);
+  assert.deepEqual(fields.get(2), [2]);
+  assert.deepEqual(fields.get(9), [2]);
+  assert.deepEqual(fields.get(19), [3]);
+});
+
+test('encodes both directions for round-trip structured searches', () => {
+  const criteria = normalizeGoogleFlightsSearchCriteria({
+    origin: 'JFK',
+    destination: 'LAX',
+    departureDate: '2099-08-10',
+    returnDate: '2099-08-17',
+    tripType: 'round-trip',
+    adults: 1,
+    cabinClass: 'economy',
+  }, new Date('2099-01-01T00:00:00Z'));
+  const url = buildGoogleFlightsSearchUrl(criteria);
+  const decodedText = Buffer.from(url.searchParams.get('tfs') ?? '', 'base64url').toString('utf8');
+  const fields = outerVarints(url);
+  assert.match(decodedText, /2099-08-10/);
+  assert.match(decodedText, /2099-08-17/);
+  assert.equal((decodedText.match(/JFK/g) ?? []).length, 2);
+  assert.equal((decodedText.match(/LAX/g) ?? []).length, 2);
+  assert.deepEqual(fields.get(2), [0]);
+  assert.deepEqual(fields.get(19), [1]);
+});
+
+test('rejects invalid structured search criteria', () => {
+  const now = new Date('2099-01-01T00:00:00Z');
+  const valid = {
+    origin: 'JFK',
+    destination: 'LAX',
+    departureDate: '2099-08-10',
+    returnDate: '2099-08-17',
+    tripType: 'round-trip',
+    adults: 1,
+    cabinClass: 'economy',
+  };
+  assert.throws(() => normalizeGoogleFlightsSearchCriteria({ ...valid, origin: 'New York' }, now), /IATA/);
+  assert.throws(() => normalizeGoogleFlightsSearchCriteria({ ...valid, destination: 'JFK' }, now), /different/);
+  assert.throws(() => normalizeGoogleFlightsSearchCriteria({ ...valid, departureDate: '2000-01-01' }, now), /past/);
+  assert.throws(() => normalizeGoogleFlightsSearchCriteria({ ...valid, returnDate: '2099-08-01' }, now), /before/);
+  assert.throws(() => normalizeGoogleFlightsSearchCriteria({ ...valid, adults: 10 }, now), /1 to 9/);
+  assert.throws(() => normalizeGoogleFlightsSearchCriteria({ ...valid, cabinClass: 'coach' }, now), /cabinClass/);
+  assert.throws(() => normalizeGoogleFlightsSearchCriteria({ ...valid, tripType: 'multi-city' }, now), /tripType/);
+});
 
 test('parses, groups, normalizes, deduplicates, and links Google Flights entries', () => {
   const data = parseGoogleFlightsSearchHtml(

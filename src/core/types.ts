@@ -8,6 +8,13 @@ export interface ExtractRequest {
   type?: ExtractType;
   query?: string;
   videoId?: string;
+  origin?: string;
+  destination?: string;
+  departureDate?: string;
+  returnDate?: string;
+  tripType?: string;
+  adults?: number;
+  cabinClass?: string;
 }
 
 export interface ExtractSuccess<TData = unknown> {

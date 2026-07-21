@@ -11,6 +11,7 @@ import {
 import {
   canHandleGoogleFlightsUrl,
   extractGoogleFlightsSearch,
+  extractGoogleFlightsStructuredSearch,
 } from './google-flights.js';
 import { type ExtractRequest, type ExtractSuccess, unsupported } from '../core/types.js';
 
@@ -37,8 +38,12 @@ export async function extract(input: ExtractRequest): Promise<ExtractSuccess> {
   }
 
   if (input.provider === 'google-flights') {
-    if (input.type === 'search') return extractGoogleFlightsSearch(input);
-    unsupported('Google Flights requires type "search" and a Google Flights search URL');
+    if (input.type === 'search') {
+      return typeof input.url === 'string' && input.url.trim()
+        ? extractGoogleFlightsSearch(input)
+        : extractGoogleFlightsStructuredSearch(input);
+    }
+    unsupported('Google Flights requires type "search" and either a search URL or structured criteria');
   }
 
   const url = parseUrl(input.url);
