@@ -54,6 +54,11 @@ Google Flights also accepts structured searches:
 codes. Structured responses include the normalized request as
 `data.searchCriteria`. One-way requests omit `returnDate`.
 
+For round trips, the returned list contains outbound candidates. Google only
+returns a dynamic loading shell for round-trip deep links in the initial HTML,
+so Website2API fetches the equivalent one-way outbound result page while
+retaining the round-trip `sourceUrl` and booking-link context.
+
 Provider search:
 
 ```json

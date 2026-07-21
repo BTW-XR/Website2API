@@ -323,11 +323,11 @@ export function buildGoogleFlightsSearchUrl(criteria: GoogleFlightsSearchCriteri
     encodeInteger(1, 28),
     encodeInteger(2, criteria.tripType === 'one-way' ? 2 : 0),
     ...legs.map((leg) => encodeBytes(3, leg)),
-    encodeInteger(8, 1),
-    encodeInteger(9, criteria.adults),
+    ...Array.from({ length: criteria.adults }, () => encodeInteger(8, 1)),
+    encodeInteger(9, CABIN_CLASS_CODES[criteria.cabinClass]),
     encodeInteger(14, 1),
     encodeBytes(16, filterDefaults),
-    encodeInteger(19, CABIN_CLASS_CODES[criteria.cabinClass]),
+    encodeInteger(19, criteria.tripType === 'one-way' ? 2 : 1),
   ]);
 
   const url = new URL('https://www.google.com/travel/flights/search');
@@ -336,6 +336,19 @@ export function buildGoogleFlightsSearchUrl(criteria: GoogleFlightsSearchCriteri
   url.searchParams.set('gl', 'US');
   url.searchParams.set('curr', 'USD');
   return url;
+}
+
+export function buildGoogleFlightsResultsFetchUrl(criteria: GoogleFlightsSearchCriteria): URL {
+  if (criteria.tripType === 'one-way') return buildGoogleFlightsSearchUrl(criteria);
+  // Google currently returns only a client-side loading shell for round-trip
+  // deep links in the initial HTML response. Fetch the equivalent outbound
+  // one-way page for its server-rendered list, while the caller retains the
+  // round-trip source URL for detail-link selection context.
+  return buildGoogleFlightsSearchUrl({
+    ...criteria,
+    tripType: 'one-way',
+    returnDate: undefined,
+  });
 }
 
 function replaceSearchSelection(searchTfs: string, selections: Buffer[]): string | null {
@@ -760,13 +773,18 @@ export async function extractGoogleFlightsStructuredSearch(
   input: GoogleFlightsStructuredSearchInput,
 ): Promise<ExtractSuccess<GoogleFlightsSearchData>> {
   const searchCriteria = normalizeGoogleFlightsSearchCriteria(input);
-  const response = await extractGoogleFlightsSearch({
-    url: buildGoogleFlightsSearchUrl(searchCriteria).href,
-  });
+  const sourceUrl = buildGoogleFlightsSearchUrl(searchCriteria);
+  const fetchUrl = buildGoogleFlightsResultsFetchUrl(searchCriteria);
+  const html = await fetchText(fetchUrl, { timeoutMs: 20000 });
+  const parsed = parseGoogleFlightsSearchHtml(html, sourceUrl);
   return {
-    ...response,
+    ok: true,
+    provider: 'google-flights',
+    type: 'search',
+    sourceUrl: sourceUrl.href,
     data: {
-      ...response.data,
+      ...parsed,
+      tripType: searchCriteria.tripType === 'round-trip' ? 'Round trip' : 'One way',
       searchCriteria,
     },
   };

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildGoogleFlightsSearchUrl,
+  buildGoogleFlightsResultsFetchUrl,
   canHandleGoogleFlightsUrl,
   extractGoogleFlightsSearch,
   normalizeGoogleFlightsSearchCriteria,
@@ -122,8 +123,9 @@ test('normalizes and encodes one-way structured searches', () => {
   assert.equal(decoded.includes(Buffer.from('LAX')), true);
   assert.equal(decoded.includes(Buffer.from('2099-08-10')), true);
   assert.deepEqual(fields.get(2), [2]);
-  assert.deepEqual(fields.get(9), [2]);
-  assert.deepEqual(fields.get(19), [3]);
+  assert.deepEqual(fields.get(8), [1, 1]);
+  assert.deepEqual(fields.get(9), [3]);
+  assert.deepEqual(fields.get(19), [2]);
 });
 
 test('encodes both directions for round-trip structured searches', () => {
@@ -144,7 +146,16 @@ test('encodes both directions for round-trip structured searches', () => {
   assert.equal((decodedText.match(/JFK/g) ?? []).length, 2);
   assert.equal((decodedText.match(/LAX/g) ?? []).length, 2);
   assert.deepEqual(fields.get(2), [0]);
+  assert.deepEqual(fields.get(8), [1]);
+  assert.deepEqual(fields.get(9), [1]);
   assert.deepEqual(fields.get(19), [1]);
+
+  const fetchUrl = buildGoogleFlightsResultsFetchUrl(criteria);
+  const fetchDecoded = Buffer.from(fetchUrl.searchParams.get('tfs') ?? '', 'base64url').toString('utf8');
+  const fetchFields = outerVarints(fetchUrl);
+  assert.match(fetchDecoded, /2099-08-10/);
+  assert.doesNotMatch(fetchDecoded, /2099-08-17/);
+  assert.deepEqual(fetchFields.get(19), [2]);
 });
 
 test('rejects invalid structured search criteria', () => {
