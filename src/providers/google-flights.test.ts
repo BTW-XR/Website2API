@@ -19,11 +19,13 @@ function flightItem(
   label: string,
   itinerary: string,
   emissionsLabel?: string,
+  airlineCodes: string[] = [],
 ): string {
   return `
     <li>
       <div data-id="${id}">
         <div role="link" aria-label="${label}"></div>
+        ${airlineCodes.map((code) => `<div style="--travel-primitives-themeable-image-default: url(https://www.gstatic.com/flights/airline_logos/70px/${code}.png); --travel-primitives-themeable-image-dark: url(https://www.gstatic.com/flights/airline_logos/70px/dark/${code}.png);"></div>`).join('')}
         <span>ATL</span><span>MSP</span>
         ${
           emissionsLabel
@@ -45,13 +47,13 @@ const fixture = `<!doctype html>
       <div aria-label="Track prices from Atlanta to Minneapolis departing 2026-10-19"></div>
       <h3>Top flights</h3>
       <ul>
-        ${flightItem('Top001', topLabel, 'ATL-MSP-F9-3045-20261019', 'Carbon emissions estimate: 108 kilograms. -46% emissions. Learn more about this emissions estimate')}
+        ${flightItem('Top001', topLabel, 'ATL-MSP-F9-3045-20261019', 'Carbon emissions estimate: 108 kilograms. -46% emissions. Learn more about this emissions estimate', ['F9'])}
         ${flightItem('Top001', topLabel, 'ATL-MSP-F9-3045-20261019')}
       </ul>
       <h3>Prices are currently high</h3>
       <h3>Other flights</h3>
       <ul>
-        ${flightItem('Other1', otherLabel, 'ATL-ORD-DL-111-20261019,ORD-MSP-UA-222-20261020', 'Carbon emissions estimate: 204 kilograms. Average emissions. Learn more about this emissions estimate')}
+        ${flightItem('Other1', otherLabel, 'ATL-ORD-DL-111-20261019,ORD-MSP-UA-222-20261020', 'Carbon emissions estimate: 204 kilograms. Average emissions. Learn more about this emissions estimate', ['DL', 'UA'])}
       </ul>
       <script>
         AF_initDataCallback({key: 'ds:1', data:[
@@ -202,6 +204,9 @@ test('parses, groups, normalizes, deduplicates, and links Google Flights entries
   assert.ok(top);
   assert.equal(top.group, 'top');
   assert.deepEqual(top.airlines, ['Frontier']);
+  assert.deepEqual(top.airlineLogoUrls, [
+    'https://www.gstatic.com/flights/airline_logos/70px/F9.png',
+  ]);
   assert.equal(top.departure.code, 'ATL');
   assert.equal(top.arrival.code, 'MSP');
   assert.equal(top.departure.localDateTime, '2026-10-19T13:36:00');
@@ -225,6 +230,10 @@ test('parses, groups, normalizes, deduplicates, and links Google Flights entries
   assert.ok(other);
   assert.equal(other.group, 'other');
   assert.deepEqual(other.airlines, ['Delta', 'United']);
+  assert.deepEqual(other.airlineLogoUrls, [
+    'https://www.gstatic.com/flights/airline_logos/70px/DL.png',
+    'https://www.gstatic.com/flights/airline_logos/70px/UA.png',
+  ]);
   assert.equal(other.arrival.localDate, '2026-10-20');
   assert.equal(other.arrival.localDateTime, '2026-10-20T00:15:00');
   assert.equal(other.price.status, 'unavailable');

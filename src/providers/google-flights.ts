@@ -47,6 +47,7 @@ export interface GoogleFlightEntry {
   group: 'top' | 'other';
   rawLabel: string;
   airlines: string[];
+  airlineLogoUrls: string[];
   departure: GoogleFlightsSchedulePoint;
   arrival: GoogleFlightsSchedulePoint;
   durationText: string;
@@ -543,6 +544,21 @@ function parseAirlines(value: string): string[] {
     .filter(Boolean);
 }
 
+function extractAirlineLogoUrls(
+  $: cheerio.CheerioAPI,
+  root: cheerio.Cheerio<AnyNode>,
+): string[] {
+  const urls = new Set<string>();
+  root.find('[style*="--travel-primitives-themeable-image-default"]').each((_, element) => {
+    const style = $(element).attr('style') ?? '';
+    const match = style.match(
+      /--travel-primitives-themeable-image-default\s*:\s*url\((['"]?)(https:\/\/www\.gstatic\.com\/flights\/airline_logos\/[^)'"\s]+)\1\)/i,
+    );
+    if (match?.[2]) urls.add(match[2]);
+  });
+  return [...urls];
+}
+
 function parseLayovers(rawLabel: string, airportCodes: string[]): GoogleFlightsLayover[] {
   const layovers: GoogleFlightsLayover[] = [];
   const pattern = /Layover \(\d+ of \d+\) is a ([^.]+?) layover at ([^.]+?)(?: in [^.]+)?\./g;
@@ -609,6 +625,7 @@ function parseEntry(
   const percent = emissionsLabel?.match(/([+-]\d+)% emissions/i)?.[1];
   const comparison = emissionsLabel?.match(/kilograms\.\s*(.+? emissions)\./i)?.[1] ?? null;
   const airlines = parseAirlines(cleanText(core[4]));
+  const airlineLogoUrls = extractAirlineLogoUrls($, root);
   const durationText = cleanText(core[11]);
 
   return {
@@ -616,6 +633,7 @@ function parseEntry(
     group,
     rawLabel,
     airlines,
+    airlineLogoUrls,
     departure: {
       ...parseAirport(cleanText(core[5]), departureCode),
       dateText: departureDateText,
